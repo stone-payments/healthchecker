@@ -15,7 +15,7 @@ namespace HealthChecker
     {
         private readonly List<RabbitMQClient> _rabbitMQTargets;
 
-        private readonly List<SqlConnection> _sqlServerTargets;
+        private readonly List<Tuple<SqlConnection, Dictionary<string, object>>> _sqlServerTargets;
 
         private readonly List<Uri> _serviceTargets;
 
@@ -34,12 +34,12 @@ namespace HealthChecker
         public HealthCheckerInstance()
         {
             _rabbitMQTargets = new List<RabbitMQClient>();
-            _sqlServerTargets = new List<SqlConnection>();
+            _sqlServerTargets = new List<Tuple<SqlConnection, Dictionary<string, object>>>();
             _serviceTargets = new List<Uri>();
             _httpClient = new HttpClient();
         }
 
-        public HealthCheckerInstance Add<T>(T targetData, bool required = true)
+        public HealthCheckerInstance Add<T>(T targetData, bool required = true, Dictionary<string, object> additionalData = null)
         {
             switch (targetData)
             {
@@ -60,7 +60,7 @@ namespace HealthChecker
                         AssertSQLServerInfrastructure(connection).Wait();
                     }
 
-                    _sqlServerTargets.Add(connection);
+                    _sqlServerTargets.Add(new Tuple<SqlConnection, Dictionary<string, object>>(connection, additionalData ?? new Dictionary<string, object>()));
                     break;
                 }
                 case Uri uri:
@@ -78,21 +78,21 @@ namespace HealthChecker
             return this;
         }
 
-        public HealthCheckerInstance Add(HealthCheckTargetType targetType, string targetData, bool required = true)
+        public HealthCheckerInstance Add(HealthCheckTargetType targetType, string targetData, bool required = true, Dictionary<string, object> additionalData = null)
         {
             switch (targetType)
             {
                 case HealthCheckTargetType.RabbitMQ:
                 {
-                    return Add(new RabbitMQClient(targetData), required);
+                    return Add(new RabbitMQClient(targetData), required, additionalData);
                 }
                 case HealthCheckTargetType.SQLServer:
                 {
-                    return Add(new SqlConnection(targetData), required);
+                    return Add(new SqlConnection(targetData), required, additionalData);
                 }
                 case HealthCheckTargetType.Service:
                 {
-                    return Add(new Uri(targetData), required);
+                    return Add(new Uri(targetData), required, additionalData);
                 }
                 default:
                 {
@@ -158,13 +158,13 @@ namespace HealthChecker
             })));
         }
 
-        private static async Task AssertSQLServerInfrastructure(SqlConnection connection)
+        private static async Task AssertSQLServerInfrastructure(SqlConnection connection, IReadOnlyDictionary<string, object> additionalData = null)
         {
             using (var cmd = new SqlCommand())
             {
                 cmd.Connection = connection;
                 cmd.CommandType = CommandType.Text;
-                cmd.CommandText = $"SELECT 1 FROM {SQLHealthTableName} WHERE 1 = 0";
+                cmd.CommandText = additionalData!= null && additionalData.ContainsKey("query") ? (string)additionalData["query"] : $"SELECT 1 FROM {SQLHealthTableName} WHERE 1 = 0";
 
                 await connection.OpenAsync();
                 await cmd.ExecuteNonQueryAsync();
@@ -183,15 +183,15 @@ namespace HealthChecker
                 {
                     using (var cmd = new SqlCommand())
                     {
-                        cmd.Connection = s;
+                        cmd.Connection = s.Item1;
                         cmd.CommandType = CommandType.Text;
-                        cmd.CommandText = $@"INSERT INTO {SQLHealthTableName}({SQLHealthClientIdentifierColumn}) VALUES(@clientIdentifier)";
+                        cmd.CommandText = s.Item2 != null && s.Item2.ContainsKey("query") ? (string)s.Item2["query"] : $@"INSERT INTO {SQLHealthTableName}({SQLHealthClientIdentifierColumn}) VALUES(@clientIdentifier)";
 
                         cmd.Parameters.AddWithValue("@clientIdentifier", GetClientIdentifier());
 
-                        await s.OpenAsync();
+                        await s.Item1.OpenAsync();
                         await cmd.ExecuteNonQueryAsync();
-                        s.Close();
+                        s.Item1.Close();
                     }
                 }
                 catch (Exception e)
@@ -209,7 +209,7 @@ namespace HealthChecker
                     ErrorInfo = errorInfo,
                     IsHealthy = errorInfo == null,
                     ResponseTime = stopwatch.Elapsed,
-                    HealthCheckTargetIdentifier = $"{s.Database}@{s.DataSource}",
+                    HealthCheckTargetIdentifier = $"{s.Item1.Database}@{s.Item1.DataSource}",
                 };
             })));
         }
