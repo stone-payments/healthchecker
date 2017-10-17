@@ -57,7 +57,7 @@ namespace HealthChecker
                 {
                     if (required)
                     {
-                        AssertSQLServerInfrastructure(connection).Wait();
+                        AssertSQLServerInfrastructure(connection, additionalData).Wait();
                     }
 
                     _sqlServerTargets.Add(new Tuple<SqlConnection, Dictionary<string, object>>(connection, additionalData ?? new Dictionary<string, object>()));
