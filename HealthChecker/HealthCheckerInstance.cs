@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
@@ -6,6 +7,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using RabbitMQ.Abstraction;
 using RabbitMQ.Abstraction.Messaging;
 using RabbitMQ.Abstraction.Messaging.Interfaces;
 
@@ -39,7 +41,7 @@ namespace HealthChecker
             _httpClient = new HttpClient();
         }
 
-        public HealthCheckerInstance Add<T>(T targetData, bool required = true, Dictionary<string, object> additionalData = null)
+        public async Task<HealthCheckerInstance> AddAsync<T>(T targetData, bool required = true, Dictionary<string, object> additionalData = null)
         {
             switch (targetData)
             {
@@ -47,7 +49,7 @@ namespace HealthChecker
                 {
                     if (required)
                     {
-                        SetupQueueInfrastructure(client);
+                        await SetupQueueInfrastructureAsync(client);
                     }
 
                     _rabbitMQTargets.Add(client);
@@ -78,21 +80,21 @@ namespace HealthChecker
             return this;
         }
 
-        public HealthCheckerInstance Add(HealthCheckTargetType targetType, string targetData, bool required = true, Dictionary<string, object> additionalData = null)
+        public Task<HealthCheckerInstance> AddAsync(HealthCheckTargetType targetType, string targetData, bool required = true, Dictionary<string, object> additionalData = null)
         {
             switch (targetType)
             {
                 case HealthCheckTargetType.RabbitMQ:
                 {
-                    return Add(new RabbitMQClient(targetData), required, additionalData);
+                    return AddAsync(new RabbitMQClient(targetData), required, additionalData);
                 }
                 case HealthCheckTargetType.SQLServer:
                 {
-                    return Add(new SqlConnection(targetData), required, additionalData);
+                    return AddAsync(new SqlConnection(targetData), required, additionalData);
                 }
                 case HealthCheckTargetType.Service:
                 {
-                    return Add(new Uri(targetData), required, additionalData);
+                    return AddAsync(new Uri(targetData), required, additionalData);
                 }
                 default:
                 {
@@ -118,25 +120,27 @@ namespace HealthChecker
             return System.Reflection.Assembly.GetEntryAssembly().GetName().Name;
         }
 
-        private void SetupQueueInfrastructure(IQueueClient client)
+        private async Task SetupQueueInfrastructureAsync(IQueueClient client)
         {
-            client.ExchangeDeclare(QueuingExchangeName);
+            await client.ExchangeDeclareAsync(QueuingExchangeName);
 
-            client.QueueDeclare(_queuingQueueName);
+            await client.QueueDeclareAsync(_queuingQueueName);
 
-            client.QueueBind(_queuingQueueName, QueuingExchangeName, QueuingRoutingKey);
+            await client.QueueBindAsync(_queuingQueueName, QueuingExchangeName, QueuingRoutingKey);
         }
 
         private async Task<IEnumerable<HealthCheckResult>> CheckRabbitMQ()
         {
-            return await Task.WhenAll(_rabbitMQTargets.Select(c => Task.Run(() =>
+            var healthCheckResults = new ConcurrentBag<HealthCheckResult>();
+
+            await _rabbitMQTargets.ForEachAsync(async t =>
             {
                 var stopwatch = Stopwatch.StartNew();
                 string errorInfo = null;
 
                 try
                 {
-                    c.Publish(QueuingExchangeName, QueuingRoutingKey, DateTimeOffset.UtcNow);
+                    await t.PublishAsync(QueuingExchangeName, QueuingRoutingKey, DateTimeOffset.UtcNow);
                 }
                 catch (Exception e)
                 {
@@ -147,15 +151,17 @@ namespace HealthChecker
                     stopwatch.Stop();
                 }
 
-                return new HealthCheckResult
+                healthCheckResults.Add(new HealthCheckResult
                 {
                     HealthCheckTarget = HealthCheckTargetType.RabbitMQ,
                     ErrorInfo = errorInfo,
                     IsHealthy = errorInfo == null,
                     ResponseTime = stopwatch.Elapsed,
-                    HealthCheckTargetIdentifier = c.ToString(),
-                };
-            })));
+                    HealthCheckTargetIdentifier = t.ToString(),
+                });
+            });
+
+            return healthCheckResults;
         }
 
         private static async Task AssertSQLServerInfrastructure(SqlConnection connection, IReadOnlyDictionary<string, object> additionalData = null)

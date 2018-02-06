@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard1.6</TargetFramework>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>Stone.HealthChecker</PackageId>
     <PackageVersion>1.1.0-beta2</PackageVersion>
     <Title>HealthChecker</Title>
@@ -24,8 +24,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Stone.RabbitMQ.Abstraction" Version="1.2.0-beta1" />
-    <PackageReference Include="System.Data.SqlClient" Version="4.4.0" />
+    <PackageReference Include="Stone.RabbitMQ.Abstraction" Version="1.6.0-rc1" />
+    <PackageReference Include="System.Data.SqlClient" Version="4.4.2" />
   </ItemGroup>
 
 </Project>
