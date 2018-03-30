@@ -12,4 +12,4 @@ PM > Install-Package Stone.HealthChecker -Version 1.2.0-rc1
 ```
 
 ## Reconhecimentos:
-* [Contribs]https://github.com/stone-payments/healthchecker/graphs/contributors
+* [Contribs](https://github.com/stone-payments/healthchecker/graphs/contributors)
