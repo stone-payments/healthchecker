@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>Stone.HealthChecker</PackageId>
-    <PackageVersion>1.3.2-rc1</PackageVersion>
+    <PackageVersion>1.3.6-rc1</PackageVersion>
     <Title>HealthChecker</Title>
     <Authors>Stone Pagamentos</Authors>
     <Description>Simple health-checking library supporting RabbitMQ, SQL Server and HTTP Services</Description>
@@ -24,7 +24,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Stone.RabbitMQ.Abstraction" Version="2.0.0-beta8" />
+    <PackageReference Include="Stone.RabbitMQ.Abstraction" Version="2.0.0-beta12" />
     <PackageReference Include="System.Data.SqlClient" Version="4.4.2" />
   </ItemGroup>
 
