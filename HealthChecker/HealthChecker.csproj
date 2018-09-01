@@ -24,7 +24,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Stone.RabbitMQ.Abstraction" Version="2.0.1-beta2" />
+    <PackageReference Include="Stone.RabbitMQ.Abstraction" Version="2.0.1-beta3" />
     <PackageReference Include="System.Data.SqlClient" Version="4.4.2" />
   </ItemGroup>
 
